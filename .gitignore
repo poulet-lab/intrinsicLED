@@ -1,3 +1,9 @@
+# platform.io
+.pio/*
+
+# vscode
+.vscode/*
+
 # Prerequisites
 *.d
 
