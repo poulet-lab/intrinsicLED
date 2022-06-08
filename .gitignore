@@ -4,6 +4,10 @@
 # vscode
 .vscode/*
 
+# EAGLE
+*.b#*
+*.s#*
+
 # Prerequisites
 *.d
 
