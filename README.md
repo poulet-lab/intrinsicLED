@@ -1,4 +1,4 @@
-# IntrinsicLED
+# intrinsicLED
  
 # BOM (incomplete)
 * https://octopart.com/16svpf1000m-panasonic-29498310
