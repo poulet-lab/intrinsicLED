@@ -25,6 +25,7 @@ using namespace EncoderTool;
 CRGB leds[NUMLED];
 int16_t brightness[] = {0,  64, 255, 255};
 int16_t limits[] =     {0,  64, 255, 255};     // limits for brightness
+int16_t stepsize[] =   {0,   1,   4,   4};     // increment per detent
 uint8_t hue = 96;
 uint8_t chipset = 0;
 
@@ -55,7 +56,7 @@ void cbButton(int state) {
 
 void cbEncoder(int state, int delta) {
   if (enc.getButton()==RELEASED && mode > 0) {
-    int16_t newBrightness = brightness[mode] + delta * 4;
+    int16_t newBrightness = brightness[mode] + delta * stepsize[mode];
     newBrightness = constrain(newBrightness, 0, limits[mode]);
     if (newBrightness != brightness[mode]) {
       brightness[mode] = newBrightness;
