@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <EEPROM.h>
 #include <FastLED.h>
 #include "EncoderTool.h"
 using namespace EncoderTool;
@@ -17,18 +18,25 @@ using namespace EncoderTool;
 #define PRESSED   0
 #define RELEASED  1
 
+#define CPU_RESTART_ADDR (uint32_t *)0xE000ED0C
+#define CPU_RESTART_VAL 0x5FA0004
+#define CPU_RESTART (*CPU_RESTART_ADDR = CPU_RESTART_VAL);
+
 CRGB leds[NUMLED];
 int16_t brightness[] = {0, 255, 255, 255};
 uint8_t hue = 96;
+uint8_t chipset = 0;
 
 PolledEncoder enc;
 
-uint8_t mode   = OFF;
-bool changes   = true;
-bool hueChange = false;
+uint8_t mode       = OFF;
+bool changes       = true;
+bool hueChange     = false;
+uint32_t timeStamp = 0;
 
 void cbButton(int state) {
   static bool firstRun = true;
+  
   if (firstRun) {
     firstRun = false;
     return;
@@ -40,7 +48,8 @@ void cbButton(int state) {
       mode = (mode + 1) % 4;
       changes = true;
     }
-  }
+  } else if (mode==OFF)
+    timeStamp = millis();
 }
 
 void cbEncoder(int state, int delta) {
@@ -65,7 +74,19 @@ void cbEncoder(int state, int delta) {
 void setup() {
   Serial.begin(9600);
 
-  FastLED.addLeds<WS2811,PINLED>(leds, NUMLED);
+  chipset = EEPROM.read(0);
+  if (chipset > 1) {
+    chipset = 0;
+    EEPROM.update(0, chipset);
+  }
+  switch (chipset) {
+    case 0:
+      FastLED.addLeds<WS2811,PINLED>(leds, NUMLED);
+      break;
+    case 1:
+      FastLED.addLeds<NEOPIXEL,PINLED>(leds, NUMLED);
+      break;
+  }
   FastLED.showColor(CRGB::Black);
 
   enc.begin(PINENCA, PINENCB, PINBTN, CountMode::quarter, INPUT_PULLUP);
@@ -75,6 +96,7 @@ void setup() {
 
 void loop() {
   enc.tick();
+
   if (changes) {
     switch (mode) {
       case OFF:
@@ -90,5 +112,17 @@ void loop() {
         FastLED.showColor(CRGB::Red, brightness[mode]);
     }
     changes = false;
+
+  } else if (mode==OFF && enc.getButton()==PRESSED && millis()-timeStamp>10000) {
+    chipset = (chipset + 1) % 2;
+    EEPROM.update(0, chipset);
+    FastLED.showColor(CRGB::White, 32);
+    delay(50);
+    FastLED.showColor(CRGB::Black);
+    delay(50);
+    FastLED.showColor(CRGB::White, 32);
+    delay(50);
+    FastLED.showColor(CRGB::Black);
+    CPU_RESTART;
   }
 }
