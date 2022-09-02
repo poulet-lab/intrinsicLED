@@ -4,7 +4,6 @@
 #include "EncoderTool.h"
 using namespace EncoderTool;
 
-#define NUMLED   24
 #define PINLED   17
 #define PINBTN    3
 #define PINENCA   4
@@ -22,18 +21,20 @@ using namespace EncoderTool;
 #define CPU_RESTART_VAL 0x5FA0004
 #define CPU_RESTART (*CPU_RESTART_ADDR = CPU_RESTART_VAL);
 
-CRGB leds[NUMLED];
-int16_t brightness[] = {0,  64, 255, 255};
-int16_t limits[] =     {0,  64, 255, 255};     // limits for brightness
-int16_t stepsize[] =   {0,   1,   4,   4};     // increment per detent
+uint8_t nLeds;
+int8_t dir = 0;
+CRGB leds[24];
+int16_t brightness[] = {0, 128, 255, 255};
+int16_t limits[] =     {0, 128, 255, 255};     // limits for brightness
+int16_t stepsize[] =   {0,   2,   4,   4};     // increment per detent
 uint8_t hue = 96;
 uint8_t chipset = 0;
 
 PolledEncoder enc;
 
-uint8_t mode       = OFF;
-bool changes       = true;
-bool hueChange     = false;
+uint8_t mode    = OFF;
+bool changes    = true;
+bool pressTurn  = false;
 uint32_t timeStamp = 0;
 
 void cbButton(int state) {
@@ -44,8 +45,8 @@ void cbButton(int state) {
     return;
   }
   if (state==RELEASED) {
-    if (hueChange)
-      hueChange = false;
+    if (pressTurn)
+      pressTurn = false;
     else {
       mode = (mode + 1) % 4;
       changes = true;
@@ -63,11 +64,18 @@ void cbEncoder(int state, int delta) {
       changes = true;
     }
   } else if (enc.getButton()==PRESSED && mode == GREEN) {
-    hueChange = true;
+    pressTurn = true;
     uint8_t newHue = hue - delta * 4;
     newHue = constrain(newHue, 96, 160);
     if (newHue != hue) {
       hue = newHue;
+      changes = true;
+    }
+  } else if (enc.getButton()==PRESSED && mode == WHITE) {
+    pressTurn = true;
+    int8_t newDir = ((nLeds+1) + (dir+delta) % (nLeds+1)) % (nLeds+1);
+    if (newDir != dir) {
+      dir = newDir;
       changes = true;
     }
   }
@@ -83,10 +91,12 @@ void setup() {
   }
   switch (chipset) {
     case 0:
-      FastLED.addLeds<WS2811,PINLED>(leds, NUMLED);
+      nLeds = 3;
+      FastLED.addLeds<WS2811,PINLED>(leds, nLeds);
       break;
     case 1:
-      FastLED.addLeds<NEOPIXEL,PINLED>(leds, NUMLED);
+      nLeds = 24;
+      FastLED.addLeds<NEOPIXEL,PINLED>(leds, nLeds);
       break;
   }
   FastLED.showColor(CRGB::Black);
@@ -105,7 +115,14 @@ void loop() {
         FastLED.showColor(CRGB::Black);
         break;
       case WHITE:
-        FastLED.showColor(CRGB::White, brightness[mode]);
+        if (dir==0)
+          FastLED.showColor(CRGB::White, brightness[mode]);
+        else {
+          leds[dir-1] = CRGB::White;
+          FastLED.setBrightness(brightness[mode]);
+          FastLED.show();
+          leds[dir-1] = CRGB::Black;
+        }
         break;
       case GREEN:
         FastLED.showColor(CHSV(hue, 255, brightness[mode]));
